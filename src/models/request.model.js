@@ -1,29 +1,5 @@
 const mongoose = require("mongoose");
 
-const ruleEvaluationSchema = new mongoose.Schema(
-  {
-    field: { type: String, required: true },
-    operator: { type: String, enum: ["gt", "lt", "eq"], required: true },
-    expectedValue: { type: mongoose.Schema.Types.Mixed, required: true },
-    actualValue: { type: mongoose.Schema.Types.Mixed },
-    passed: { type: Boolean, required: true },
-  },
-  { _id: false },
-);
-
-const stateHistorySchema = new mongoose.Schema(
-  {
-    stage: { type: String, required: true },
-    status: {
-      type: String,
-      enum: ["pending", "approved", "rejected", "manual-review"],
-      required: true,
-    },
-    timestamp: { type: Date, default: Date.now },
-  },
-  { _id: false },
-);
-
 const requestSchema = new mongoose.Schema(
   {
     requestId: { type: String, required: true, unique: true, index: true },
@@ -39,8 +15,8 @@ const requestSchema = new mongoose.Schema(
       enum: ["approved", "rejected", "manual-review"],
       default: null,
     },
-    rulesEvaluated: { type: [ruleEvaluationSchema], default: [] },
-    stateHistory: { type: [stateHistorySchema], default: [] },
+    rulesEvaluated: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    stateHistory: { type: [mongoose.Schema.Types.Mixed], default: [] },
   },
   {
     timestamps: true,

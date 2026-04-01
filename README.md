@@ -6,6 +6,7 @@ A simple Node.js + Express API to process loan applications using configurable r
 
 - Rule-based decisions from JSON config
 - Idempotent request handling using requestId
+- External dependency retry and fallback to manual-review
 - Audit logs for request lifecycle
 
 ## Tech Stack
@@ -125,6 +126,18 @@ npm test
 ```
 
 Runs basic rule-engine tests from src/tests/request.test.js.
+
+Covered scenarios:
+
+- Happy path (all rules pass)
+- Invalid input validation
+- Duplicate request detection logic
+- Dependency retry flow
+- Rule change scenario with custom config
+
+## Architecture
+
+Detailed design notes are in ARCHITECTURE.md.
 
 ## Project Structure
 

@@ -31,8 +31,8 @@ function evaluateSingleRule(rule, data) {
   };
 }
 
-function evaluateRules(data) {
-  const evaluations = workflowConfig.rules.map((rule) =>
+function evaluateRulesWithConfig(data, config) {
+  const evaluations = config.rules.map((rule) =>
     evaluateSingleRule(rule, data),
   );
 
@@ -41,11 +41,16 @@ function evaluateRules(data) {
   return {
     decision: allPassed ? "approved" : "rejected",
     evaluations,
-    stages: workflowConfig.stages,
-    workflowName: workflowConfig.workflowName,
+    stages: config.stages,
+    workflowName: config.workflowName,
   };
+}
+
+function evaluateRules(data) {
+  return evaluateRulesWithConfig(data, workflowConfig);
 }
 
 module.exports = {
   evaluateRules,
+  evaluateRulesWithConfig,
 };

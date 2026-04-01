@@ -1,5 +1,12 @@
 const assert = require("assert");
-const { evaluateRules } = require("../engine/ruleEngine");
+const {
+  evaluateRules,
+  evaluateRulesWithConfig,
+} = require("../engine/ruleEngine");
+const {
+  validatePayload,
+  runExternalCheckWithRetry,
+} = require("../controllers/request.controller");
 
 function makeData(overrides = {}) {
   return {
@@ -71,9 +78,49 @@ const tests = {
     );
     assert.strictEqual(secondTime, true, "second request should be duplicate");
   },
+
+  invalidPayloadShouldFailValidation() {
+    const invalid = validatePayload({ requestId: "REQ-1", applicantName: "A" });
+    assert.strictEqual(invalid, false, "payload without data should fail");
+  },
+
+  externalRetryShouldSucceedOnSecondAttempt() {
+    let attempts = 0;
+    const flakyCheck = async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error("temporary failure");
+      }
+      return true;
+    };
+
+    return runExternalCheckWithRetry(2, flakyCheck).then((result) => {
+      assert.strictEqual(
+        result.passed,
+        true,
+        "retry flow should eventually pass",
+      );
+      assert.strictEqual(result.attempts, 2, "should pass on second attempt");
+    });
+  },
+
+  ruleChangeScenarioShouldUseNewConfig() {
+    const customConfig = {
+      workflowName: "loan_approval_v2",
+      stages: ["intake", "rules_check", "decision"],
+      rules: [{ field: "age", operator: "gt", value: 30 }],
+    };
+
+    const result = evaluateRulesWithConfig({ age: 25 }, customConfig);
+    assert.strictEqual(
+      result.decision,
+      "rejected",
+      "new rule should change decision",
+    );
+  },
 };
 
-function runAllTests() {
+async function runAllTests() {
   console.log("Running basic tests...");
 
   let passed = 0;
@@ -81,7 +128,7 @@ function runAllTests() {
 
   for (const [name, fn] of Object.entries(tests)) {
     try {
-      fn();
+      await fn();
       console.log("PASS -", name);
       passed += 1;
     } catch (error) {
@@ -99,8 +146,9 @@ function runAllTests() {
 }
 
 if (require.main === module) {
-  const ok = runAllTests();
-  process.exit(ok ? 0 : 1);
+  runAllTests().then((ok) => {
+    process.exit(ok ? 0 : 1);
+  });
 }
 
 module.exports = { runAllTests, tests };

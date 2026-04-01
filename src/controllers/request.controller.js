@@ -17,10 +17,37 @@ async function checkExternalCredit() {
   return Math.random() > 0.3;
 }
 
+async function runExternalCheckWithRetry(
+  maxRetries = 2,
+  checkFn = checkExternalCredit,
+) {
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const passed = await checkFn();
+      return { passed, attempts: attempt + 1, failedByError: false };
+    } catch (error) {
+      if (attempt === maxRetries) {
+        return { passed: false, attempts: attempt + 1, failedByError: true };
+      }
+    }
+  }
+
+  return { passed: false, attempts: maxRetries + 1, failedByError: true };
+}
+
 function validatePayload(body) {
   const { requestId, applicantName, data } = body;
+  return Boolean(
+    typeof requestId === "string" &&
+    typeof applicantName === "string" &&
+    data &&
+    typeof data === "object" &&
+    !Array.isArray(data),
+  );
+}
 
-  return !!requestId && !!applicantName && !!data;
+function pushState(stateHistory, stage, status) {
+  stateHistory.push({ stage, status, timestamp: new Date() });
 }
 
 async function submitRequest(req, res) {
@@ -36,22 +63,22 @@ async function submitRequest(req, res) {
       return res.status(200).json(existing);
     }
 
-    const requestDoc = new Request({
+    const requestDoc = {
       requestId,
       applicantName,
       data,
       status: "pending",
-      stateHistory: [
-        { stage: "intake", status: "pending", timestamp: new Date() },
-      ],
-    });
+      decision: null,
+      rulesEvaluated: [],
+      stateHistory: [],
+    };
+    pushState(requestDoc.stateHistory, "intake", "pending");
 
     await addAuditLog(requestId, "intake", "request_received", {
       applicantName,
       data,
     });
 
-    // Evaluate rules
     const ruleResult = evaluateRules(data);
     requestDoc.rulesEvaluated = ruleResult.evaluations;
 
@@ -63,40 +90,28 @@ async function submitRequest(req, res) {
     if (ruleResult.decision === "rejected") {
       requestDoc.status = "rejected";
       requestDoc.decision = "rejected";
-      requestDoc.stateHistory.push({
-        stage: "decision",
-        status: "rejected",
-        timestamp: new Date(),
-      });
+      pushState(requestDoc.stateHistory, "decision", "rejected");
 
       await addAuditLog(requestId, "decision", "request_rejected", {
         reason: "One or more rules failed",
       });
 
-      await requestDoc.save();
-
-      return res.status(201).json(requestDoc);
+      const savedRejected = await Request.create(requestDoc);
+      return res.status(201).json(savedRejected);
     }
 
-    let externalCheckPassed = false;
-    try {
-      externalCheckPassed = await checkExternalCredit();
-    } catch (error) {
-      externalCheckPassed = false;
-    }
+    const externalResult = await runExternalCheckWithRetry();
 
     await addAuditLog(requestId, "external_check", "external_credit_checked", {
-      passed: externalCheckPassed,
+      passed: externalResult.passed,
+      attempts: externalResult.attempts,
+      failedByError: externalResult.failedByError,
     });
 
-    if (!externalCheckPassed) {
+    if (!externalResult.passed) {
       requestDoc.status = "manual-review";
       requestDoc.decision = "manual-review";
-      requestDoc.stateHistory.push({
-        stage: "decision",
-        status: "manual-review",
-        timestamp: new Date(),
-      });
+      pushState(requestDoc.stateHistory, "decision", "manual-review");
 
       await addAuditLog(requestId, "decision", "manual_review_required", {
         reason: "External credit check failed",
@@ -104,20 +119,15 @@ async function submitRequest(req, res) {
     } else {
       requestDoc.status = "approved";
       requestDoc.decision = "approved";
-      requestDoc.stateHistory.push({
-        stage: "decision",
-        status: "approved",
-        timestamp: new Date(),
-      });
+      pushState(requestDoc.stateHistory, "decision", "approved");
 
       await addAuditLog(requestId, "decision", "request_approved", {
         reason: "All rules and external checks passed",
       });
     }
 
-    await requestDoc.save();
-
-    return res.status(201).json(requestDoc);
+    const saved = await Request.create(requestDoc);
+    return res.status(201).json(saved);
   } catch (error) {
     return res.status(500).json({
       message: "Internal server error",
@@ -167,4 +177,6 @@ module.exports = {
   submitRequest,
   getRequestById,
   getAuditByRequestId,
+  validatePayload,
+  runExternalCheckWithRetry,
 };
