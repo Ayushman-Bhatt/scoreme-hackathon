@@ -1,0 +1,9 @@
+{
+  "workflowName": "loan_approval",
+  "rules": [
+    { "field": "age", "operator": "gt", "value": 18 },
+    { "field": "salary", "operator": "gt", "value": 30000 },
+    { "field": "creditScore", "operator": "gt", "value": 600 }
+  ],
+  "stages": ["intake", "rules_check", "external_check", "decision"]
+}
