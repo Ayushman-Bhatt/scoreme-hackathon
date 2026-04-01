@@ -8,8 +8,7 @@ const app = express();
 
 app.use(express.json());
 
-// Mount routes with trailing slash to handle all /api/* paths
-app.use("/api/", requestRoutes);
+app.use("/api", requestRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });

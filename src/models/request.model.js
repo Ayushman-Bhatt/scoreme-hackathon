@@ -41,7 +41,6 @@ const requestSchema = new mongoose.Schema(
     },
     rulesEvaluated: { type: [ruleEvaluationSchema], default: [] },
     stateHistory: { type: [stateHistorySchema], default: [] },
-    retryCount: { type: Number, default: 0 },
   },
   {
     timestamps: true,

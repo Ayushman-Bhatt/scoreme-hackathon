@@ -6,9 +6,7 @@ A simple Node.js + Express API to process loan applications using configurable r
 
 - Rule-based decisions from JSON config
 - Idempotent request handling using requestId
-- Retry logic for external dependency failures
 - Audit logs for request lifecycle
-- Decision explanation endpoint
 
 ## Tech Stack
 
@@ -97,14 +95,6 @@ GET /api/audit/:requestId
 ```
 
 Get complete audit log of all decisions and state changes.
-
-### Get Decision Explanation
-
-```
-GET /api/decision-explanation/:requestId
-```
-
-Get human-readable explanation of the approval/rejection decision.
 
 ## Configuration
 
